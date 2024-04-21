@@ -1,0 +1,6 @@
+@JLSAPIExperiment_HostAddress = http://localhost:5241
+
+GET {{JLSAPIExperiment_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

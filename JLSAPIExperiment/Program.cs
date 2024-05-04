@@ -1,16 +1,15 @@
-using Infrastructure;
+using Web;
 using Infrastructure.Data;
-
+using Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
+//builder.Services.AddKeyVaultIfConfigured(builder.Configuration);
 
-builder.Services.AddControllers();
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+//builder.Services.AddApplicationServices();
 builder.Services.AddInfrastructureServices(builder.Configuration);
+builder.Services.AddWebServices();
 
 var app = builder.Build();
 
@@ -25,18 +24,32 @@ else
     app.UseHsts();
 }
 
-
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
-
+app.UseHealthChecks("/health");
 app.UseHttpsRedirection();
+app.UseStaticFiles();
 
-app.UseAuthorization();
+app.UseSwaggerUi(settings =>
+{
+    settings.Path = "/api";
+    settings.DocumentPath = "/api/specification.json";
+});
+
+app.UseRouting();
 
 app.MapControllers();
 
+app.MapControllerRoute(
+    name: "default",
+    pattern: "{controller}/{action=Index}/{id?}");
+
+app.MapRazorPages();
+
+app.MapFallbackToFile("index.html");
+
+app.UseExceptionHandler(options => { });
+
+app.Map("/", () => Results.Redirect("/api"));
+
 app.Run();
+
+public partial class Program { }

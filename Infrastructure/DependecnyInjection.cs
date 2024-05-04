@@ -5,53 +5,47 @@ using Infrastructure.Data;
 using Infrastructure.Identity;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
 
-namespace Infrastructure
+namespace Microsoft.Extensions.DependencyInjection;
+
+public static class DependencyInjection
 {
-    public static class DependencyInjection
+    public static IServiceCollection AddInfrastructureServices(this IServiceCollection services, IConfiguration configuration)
     {
+        var connectionString = configuration.GetConnectionString("DefaultConnection");
 
-        public static IServiceCollection AddInfrastructureServices(this IServiceCollection services, IConfiguration configuration)
+        Guard.Against.Null(connectionString, message: "Connection string 'DefaultConnection' not found.");
+
+        services.AddDbContext<ApplicationDbContext>((sp, options) =>
         {
-            var connectionString = configuration.GetConnectionString("DefaultConnection");
+            options.AddInterceptors(sp.GetServices<ISaveChangesInterceptor>());
 
-            Guard.Against.Null(connectionString, message: "Connection string 'DefaultConnection' not found.");
+            options.UseSqlServer(connectionString);
+        });
 
-            services.AddDbContext<ApplicationDbContext>((sp, options) =>
-            {
-                options.UseSqlServer(connectionString);
-            });
+        services.AddScoped<IApplicationDbContext>(provider => provider.GetRequiredService<ApplicationDbContext>());
 
-            services.AddScoped<IApplicationDbContext>(provider => provider.GetRequiredService<ApplicationDbContext>());
+        services.AddScoped<ApplicationDbContextInitialiser>();
 
-            services.AddScoped<ApplicationDbContextInitialiser>();
+        services.AddAuthentication()
+            .AddBearerToken(IdentityConstants.BearerScheme);
 
-            services.AddAuthentication()
-                .AddBearerToken(IdentityConstants.BearerScheme);
+        services.AddAuthorizationBuilder();
 
-            services.AddAuthorizationBuilder();
-
-
-            services
+        services
             .AddIdentityCore<ApplicationUser>()
             .AddRoles<IdentityRole>()
-            .AddEntityFrameworkStores<ApplicationDbContext>();
+            .AddEntityFrameworkStores<ApplicationDbContext>()
+            .AddApiEndpoints();
 
+        services.AddSingleton(TimeProvider.System);
+        services.AddTransient<IIdentityService, IdentityService>();
 
-            services.AddSingleton(TimeProvider.System);
+        services.AddAuthorization(options =>
+            options.AddPolicy(Policies.CanPurge, policy => policy.RequireRole(Roles.Administrator)));
 
-            services.AddTransient<IIdentityService, IdentityService>();
-
-
-           // services.AddAuthorization(options =>
-           //options.AddPolicy(Policies.CanPurge, policy => policy.RequireRole(Roles.Administrator)));
-
-
-            return services;
-
-        }
-
+        return services;
     }
 }
